@@ -39,7 +39,7 @@ struct CreateGameView: View {
     }
 
     private var maxPlayers: Int {
-        availableFormats.first { $0.format == selectedFormat }?.players ?? customMaxPlayers
+        customMaxPlayers
     }
 
     private var combinedDateTime: Date {
@@ -597,7 +597,7 @@ struct CreateGameFormView: View {
     }
 
     private var maxPlayers: Int {
-        availableFormats.first { $0.format == selectedFormat }?.players ?? customMaxPlayers
+        customMaxPlayers
     }
 
     private var combinedDateTime: Date {
