@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Game - Im In</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --accent-blue: #4B6BFB;
+      --accent-blue-light: #6B8AFF;
+      --success-green: #22C55E;
+      --warning-orange: #F59E0B;
+      --error-red: #EF4444;
+      --bg-primary: #F2F2F7;
+      --bg-card: #FFFFFF;
+      --text-primary: #000000;
+      --text-secondary: #8E8E93;
+      --border-color: #E5E5EA;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --accent-blue: #6B8AFF;
+        --bg-primary: #000000;
+        --bg-card: #1C1C1E;
+        --text-primary: #FFFFFF;
+        --text-secondary: #8E8E93;
+        --border-color: #38383A;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      min-height: 100vh;
+      padding: 16px;
+      color: var(--text-primary);
+    }
+
+    .container {
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .sport-icon {
+      width: 44px;
+      height: 44px;
+      background: rgba(75, 107, 251, 0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .header-text h1 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .header-text .subtitle {
+      font-size: 15px;
+      color: var(--text-secondary);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-left: auto;
+    }
+
+    .status-pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .status-open {
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--success-green);
+    }
+    .status-open .dot { background: var(--success-green); }
+
+    .status-full {
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--warning-orange);
+    }
+    .status-full .dot { background: var(--warning-orange); }
+
+    .status-locked {
+      background: rgba(75, 107, 251, 0.12);
+      color: var(--accent-blue);
+    }
+    .status-locked .dot { background: var(--accent-blue); }
+
+    .status-cancelled {
+      background: rgba(142, 142, 147, 0.12);
+      color: var(--text-secondary);
+    }
+    .status-cancelled .dot { background: var(--text-secondary); }
+
+    .info-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 15px;
+      color: var(--text-secondary);
+    }
+
+    .info-row .icon {
+      width: 20px;
+      text-align: center;
+      color: var(--accent-blue);
+    }
+
+    .progress-section {
+      margin-top: 20px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .progress-header .label {
+      color: var(--text-secondary);
+    }
+
+    .progress-header .count {
+      font-weight: 600;
+      color: var(--accent-blue);
+    }
+
+    .progress-header .count.full {
+      color: var(--warning-orange);
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: var(--border-color);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent-blue);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-fill.full {
+      background: var(--warning-orange);
+    }
+
+    .players-list {
+      margin-top: 16px;
+    }
+
+    .players-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .player-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .player-item:last-child {
+      border-bottom: none;
+    }
+
+    .player-avatar {
+      width: 36px;
+      height: 36px;
+      background: var(--accent-blue);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      font-weight: 600;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .player-name {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .empty-players {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--bg-primary);
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      color: var(--text-primary);
+      outline: none;
+      transition: box-shadow 0.2s;
+    }
+
+    .form-input:focus {
+      box-shadow: 0 0 0 2px var(--accent-blue);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .message {
+      padding: 14px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      text-align: center;
+      font-weight: 500;
+      font-size: 15px;
+    }
+
+    .message.success {
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--success-green);
+    }
+
+    .message.error {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--error-red);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    .loading-text {
+      color: var(--text-secondary);
+      font-size: 15px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .branding {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .branding a {
+      color: var(--accent-blue);
+      text-decoration: none;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Loading State -->
+    <div id="loading" class="card loading">
+      <div class="spinner"></div>
+      <p class="loading-text">Loading game...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="card hidden">
+      <div class="message error" id="error-message">Game not found</div>
+    </div>
+
+    <!-- Game Content -->
+    <div id="game-content" class="hidden">
+      <!-- Game Info Card -->
+      <div class="card">
+        <div class="header">
+          <div class="sport-icon" id="sport-icon">⚽</div>
+          <div class="header-text">
+            <h1 id="sport-name">Football</h1>
+            <div class="subtitle" id="game-time">Saturday, Jan 20 at 4:00 PM</div>
+          </div>
+          <div class="status-pill status-open" id="status-badge">
+            <span class="dot"></span>
+            <span id="status-text">Open</span>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <span class="icon">📍</span>
+          <span id="game-location">Central Park Field 3</span>
+        </div>
+
+        <div class="info-row">
+          <span class="icon">🎯</span>
+          <span id="game-level">Intermediate</span>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="label">Players</span>
+            <span class="count" id="player-count">7 / 10</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: 70%"></div>
+          </div>
+        </div>
+
+        <div class="players-list">
+          <div class="players-title">Who's Playing</div>
+          <div id="players-list">
+            <!-- Players will be inserted here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Join Form Card -->
+      <div class="card" id="join-form-card">
+        <div id="message-container"></div>
+
+        <form id="join-form">
+          <div class="form-group">
+            <label class="form-label">Your Name</label>
+            <input type="text" class="form-input" id="name-input" placeholder="Enter your name" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Phone (optional)</label>
+            <input type="tel" class="form-input" id="phone-input" placeholder="For game updates">
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="join-btn">I'm In!</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="branding">
+      Powered by <a href="#">Im In</a>
+    </div>
+  </div>
+
+  <script>
+    const gameId = window.location.pathname.split('/').pop();
+    const API_BASE = window.location.origin;
+
+    let gameData = null;
+
+    // Sport icons mapping
+    const sportIcons = {
+      'football': '⚽',
+      'soccer': '⚽',
+      'basketball': '🏀',
+      'tennis': '🎾',
+      'padel': '🎾',
+      'volleyball': '🏐'
+    };
+
+    // DOM Elements
+    const loadingEl = document.getElementById('loading');
+    const errorStateEl = document.getElementById('error-state');
+    const errorMessageEl = document.getElementById('error-message');
+    const gameContentEl = document.getElementById('game-content');
+    const joinFormCard = document.getElementById('join-form-card');
+    const joinForm = document.getElementById('join-form');
+    const joinBtn = document.getElementById('join-btn');
+    const messageContainer = document.getElementById('message-container');
+
+    // Format date for display
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      const options = {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      };
+      return date.toLocaleDateString('en-US', options);
+    }
+
+    // Get initials from name
+    function getInitials(name) {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+
+    // Update status badge
+    function updateStatusBadge(status) {
+      const badge = document.getElementById('status-badge');
+      const statusText = document.getElementById('status-text');
+      badge.className = 'status-pill';
+
+      switch (status) {
+        case 'open':
+          badge.classList.add('status-open');
+          statusText.textContent = 'Open';
+          break;
+        case 'full':
+          badge.classList.add('status-full');
+          statusText.textContent = 'Full';
+          break;
+        case 'locked':
+          badge.classList.add('status-locked');
+          statusText.textContent = 'Locked';
+          break;
+        case 'cancelled':
+          badge.classList.add('status-cancelled');
+          statusText.textContent = 'Cancelled';
+          break;
+      }
+    }
+
+    // Render game data
+    function renderGame(game) {
+      gameData = game;
+
+      const sportLower = game.sport.toLowerCase();
+      document.getElementById('sport-icon').textContent = sportIcons[sportLower] || '🏆';
+      document.getElementById('sport-name').textContent = game.sport;
+      document.getElementById('game-time').textContent = formatDate(game.time);
+      document.getElementById('game-location').textContent = game.location;
+      document.getElementById('game-level').textContent = game.level;
+
+      const playerCount = game.playerCount || 0;
+      const maxPlayers = game.maxPlayers;
+      const percentage = (playerCount / maxPlayers) * 100;
+      const isFull = percentage >= 100;
+
+      const countEl = document.getElementById('player-count');
+      countEl.textContent = `${playerCount} / ${maxPlayers}`;
+      countEl.classList.toggle('full', isFull);
+
+      const progressFill = document.getElementById('progress-fill');
+      progressFill.style.width = `${percentage}%`;
+      progressFill.classList.toggle('full', isFull);
+
+      updateStatusBadge(game.status);
+
+      // Render players list
+      const playersList = document.getElementById('players-list');
+      if (game.players && game.players.length > 0) {
+        playersList.innerHTML = game.players.map(player => `
+          <div class="player-item">
+            <div class="player-avatar">${getInitials(player.name)}</div>
+            <span class="player-name">${player.name}</span>
+          </div>
+        `).join('');
+      } else {
+        playersList.innerHTML = '<p class="empty-players">No players yet. Be the first to join!</p>';
+      }
+
+      // Show/hide join form based on status
+      if (game.status === 'full' || game.status === 'locked' || game.status === 'cancelled') {
+        joinFormCard.classList.add('hidden');
+
+        let message = '';
+        if (game.status === 'full') {
+          message = 'This game is full. Check back later for cancellations.';
+        } else if (game.status === 'locked') {
+          message = 'This game has been locked by the organizer.';
+        } else {
+          message = 'This game has been cancelled.';
+        }
+
+        const msgCard = document.createElement('div');
+        msgCard.className = 'card';
+        msgCard.innerHTML = `<div class="message error">${message}</div>`;
+        joinFormCard.parentNode.insertBefore(msgCard, joinFormCard);
+      }
+    }
+
+    // Fetch game data
+    async function fetchGame() {
+      try {
+        const response = await fetch(`${API_BASE}/games/${gameId}`);
+
+        if (!response.ok) {
+          throw new Error('Game not found');
+        }
+
+        const game = await response.json();
+
+        loadingEl.classList.add('hidden');
+        gameContentEl.classList.remove('hidden');
+
+        renderGame(game);
+      } catch (error) {
+        loadingEl.classList.add('hidden');
+        errorStateEl.classList.remove('hidden');
+        errorMessageEl.textContent = error.message || 'Failed to load game';
+      }
+    }
+
+    // Handle form submission
+    joinForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById('name-input').value.trim();
+      const phone = document.getElementById('phone-input').value.trim();
+
+      if (!name) {
+        messageContainer.innerHTML = '<div class="message error">Please enter your name</div>';
+        return;
+      }
+
+      joinBtn.disabled = true;
+      joinBtn.textContent = 'Joining...';
+
+      try {
+        const response = await fetch(`${API_BASE}/games/${gameId}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone: phone || null })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to join');
+        }
+
+        // Success
+        messageContainer.innerHTML = `<div class="message success">${data.message}</div>`;
+        joinForm.classList.add('hidden');
+
+        // Update game display
+        if (data.game) {
+          renderGame(data.game);
+        }
+      } catch (error) {
+        messageContainer.innerHTML = `<div class="message error">${error.message}</div>`;
+        joinBtn.disabled = false;
+        joinBtn.textContent = "I'm In!";
+      }
+    });
+
+    // Initial load
+    fetchGame();
+  </script>
+</body>
+</html>

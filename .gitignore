@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Build outputs
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# iOS
+ios/ImIn/ImIn.xcodeproj/project.xcworkspace/xcuserdata/
+ios/ImIn/ImIn.xcodeproj/xcuserdata/
+*.xcuserstate
+
+# Logs
+*.log
+npm-debug.log*
