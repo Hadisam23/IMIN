@@ -241,10 +241,10 @@ router.post('/:id/join', (req, res) => {
   }
 });
 
-// PATCH /games/:id - Update game status
+// PATCH /games/:id - Update game status or visibility
 router.patch('/:id', (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, isPublic } = req.body;
     const gameId = req.params.id;
 
     const game = db.games.get(gameId);
@@ -255,6 +255,10 @@ router.patch('/:id', (req, res) => {
 
     if (status && ['open', 'full', 'locked', 'cancelled'].includes(status)) {
       game.status = status;
+    }
+
+    if (typeof isPublic === 'boolean') {
+      game.isPublic = isPublic;
     }
 
     const players = getJoinedPlayers(gameId);

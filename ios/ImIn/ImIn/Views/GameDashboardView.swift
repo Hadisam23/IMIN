@@ -30,17 +30,30 @@ struct GameDashboardView: View {
     }
 
     var body: some View {
-        Group {
-            if isLoading && game == nil {
-                loadingView
-            } else if let game = game {
-                gameContent(game)
-            } else {
-                errorView
+        NavigationStack {
+            Group {
+                if isLoading && game == nil {
+                    loadingView
+                } else if let game = game {
+                    gameContent(game)
+                } else {
+                    errorView
+                }
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
         }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
         .task {
             await loadGame()
         }
@@ -287,6 +300,9 @@ struct GameDashboardView: View {
 
     private func actionsCard(_ game: Game) -> some View {
         VStack(spacing: 12) {
+            // Visibility toggle
+            visibilityToggle(game)
+
             // Share button
             Button {
                 showShareSheet = true
@@ -340,6 +356,55 @@ struct GameDashboardView: View {
                 }
                 .disabled(game.status == .cancelled)
                 .opacity(game.status == .cancelled ? 0.5 : 1)
+            }
+        }
+    }
+
+    private func visibilityToggle(_ game: Game) -> some View {
+        let isPublic = game.isPublic ?? false
+
+        return Button {
+            toggleVisibility(!isPublic)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: isPublic ? "globe" : "lock.fill")
+                    .font(.title3)
+                    .foregroundColor(isPublic ? .accentBlue : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isPublic ? "Public Game" : "Private Game")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    Text(isPublic ? "Visible in Discover - tap to make private" : "Only via link - tap to make public")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(16)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isPublic ? Color.accentBlue.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleVisibility(_ isPublic: Bool) {
+        Task {
+            do {
+                let updatedGame = try await api.updateGameVisibility(id: gameId, isPublic: isPublic)
+                self.game = updatedGame
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }
