@@ -4,6 +4,7 @@ import SwiftUI
 struct CreateGameView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject var userManager: UserManager
     private let api = APIService.shared
 
     let onGameCreated: (Game) -> Void
@@ -21,7 +22,6 @@ struct CreateGameView: View {
     @State private var createdGame: Game?
     @State private var showShareSheet = false
     @State private var imPlaying = true
-    @State private var myName = ""
 
     private let sports = ["Football", "Padel", "Tennis", "Basketball"]
     private let levels = ["Beginner", "Intermediate", "Advanced", "Pro"]
@@ -55,7 +55,7 @@ struct CreateGameView: View {
     }
 
     private var canCreate: Bool {
-        !location.isEmpty && (!imPlaying || !myName.trimmingCharacters(in: .whitespaces).isEmpty)
+        !location.isEmpty
     }
 
     private var dateDisplayText: String {
@@ -285,33 +285,23 @@ struct CreateGameView: View {
 
     // MARK: - Organizer Section
     private var organizerSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle(isOn: $imPlaying) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.fill.checkmark")
-                        .font(.title3)
-                        .foregroundColor(imPlaying ? .accentBlue : .secondary)
+        Toggle(isOn: $imPlaying) {
+            HStack(spacing: 12) {
+                Image(systemName: "person.fill.checkmark")
+                    .font(.title3)
+                    .foregroundColor(imPlaying ? .accentBlue : .secondary)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("I'm playing too")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("Count me as a player")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("I'm In")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text("Count me as a player")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
-            .tint(.accentBlue)
-
-            if imPlaying {
-                TextField("Your name", text: $myName)
-                    .font(.body)
-                    .padding(14)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(10)
-            }
         }
+        .tint(.accentBlue)
         .padding(16)
         .background(Color(.systemBackground))
         .cornerRadius(12)
@@ -340,12 +330,6 @@ struct CreateGameView: View {
                 .cornerRadius(14)
             }
             .disabled(!canCreate || isLoading)
-
-            if imPlaying && myName.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text("Enter your name to join as a player")
-                    .font(.caption)
-                    .foregroundColor(.warningOrange)
-            }
         }
         .padding(.top, 8)
     }
@@ -451,8 +435,8 @@ struct CreateGameView: View {
                     maxPlayers: maxPlayers
                 )
 
-                if imPlaying && !myName.trimmingCharacters(in: .whitespaces).isEmpty {
-                    game = try await api.joinGame(id: game.id, name: myName.trimmingCharacters(in: .whitespaces))
+                if imPlaying, let userName = userManager.currentUser?.name {
+                    game = try await api.joinGame(id: game.id, name: userName)
                 }
 
                 createdGame = game
@@ -562,10 +546,10 @@ struct ShareSheet: UIViewControllerRepresentable {
 // MARK: - CreateGameFormView (For Tab Context)
 struct CreateGameFormView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject var userManager: UserManager
     private let api = APIService.shared
 
     let onGameCreated: (Game) -> Void
-    let userName: String
 
     @State private var sport = "Basketball"
     @State private var selectedFormat = "5v5"
@@ -580,7 +564,6 @@ struct CreateGameFormView: View {
     @State private var createdGame: Game?
     @State private var showShareSheet = false
     @State private var imPlaying = true
-    @State private var myName = ""
 
     private let sports = ["Football", "Padel", "Tennis", "Basketball"]
     private let levels = ["Beginner", "Intermediate", "Advanced", "Pro"]
@@ -614,7 +597,7 @@ struct CreateGameFormView: View {
     }
 
     private var canCreate: Bool {
-        !location.isEmpty && (!imPlaying || !myName.trimmingCharacters(in: .whitespaces).isEmpty)
+        !location.isEmpty
     }
 
     var body: some View {
@@ -634,9 +617,6 @@ struct CreateGameFormView: View {
             if let game = createdGame, let url = game.joinUrl {
                 ShareSheet(items: [URL(string: url)!])
             }
-        }
-        .onAppear {
-            myName = userName
         }
     }
 
@@ -814,33 +794,23 @@ struct CreateGameFormView: View {
 
     // MARK: - Organizer Section
     private var organizerSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle(isOn: $imPlaying) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.fill.checkmark")
-                        .font(.title3)
-                        .foregroundColor(imPlaying ? .accentBlue : .secondary)
+        Toggle(isOn: $imPlaying) {
+            HStack(spacing: 12) {
+                Image(systemName: "person.fill.checkmark")
+                    .font(.title3)
+                    .foregroundColor(imPlaying ? .accentBlue : .secondary)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("I'm playing too")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("Count me as a player")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("I'm In")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text("Count me as a player")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
-            .tint(.accentBlue)
-
-            if imPlaying {
-                TextField("Your name", text: $myName)
-                    .font(.body)
-                    .padding(14)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(10)
-            }
         }
+        .tint(.accentBlue)
         .padding(16)
         .background(Color(.systemBackground))
         .cornerRadius(12)
@@ -869,12 +839,6 @@ struct CreateGameFormView: View {
                 .cornerRadius(14)
             }
             .disabled(!canCreate || isLoading)
-
-            if imPlaying && myName.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text("Enter your name to join as a player")
-                    .font(.caption)
-                    .foregroundColor(.warningOrange)
-            }
         }
         .padding(.top, 8)
     }
@@ -982,8 +946,8 @@ struct CreateGameFormView: View {
                     maxPlayers: maxPlayers
                 )
 
-                if imPlaying && !myName.trimmingCharacters(in: .whitespaces).isEmpty {
-                    game = try await api.joinGame(id: game.id, name: myName.trimmingCharacters(in: .whitespaces))
+                if imPlaying, let userName = userManager.currentUser?.name {
+                    game = try await api.joinGame(id: game.id, name: userName)
                 }
 
                 createdGame = game
@@ -1001,6 +965,7 @@ struct CreateGameFormView: View {
 
 #Preview("Tab Form") {
     NavigationStack {
-        CreateGameFormView(onGameCreated: { _ in }, userName: "John")
+        CreateGameFormView(onGameCreated: { _ in })
+            .environmentObject(UserManager.shared)
     }
 }

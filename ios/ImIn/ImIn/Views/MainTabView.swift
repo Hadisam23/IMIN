@@ -46,8 +46,7 @@ struct CreateGameTabView: View {
                 onGameCreated: { game in
                     createdGame = game
                     showSuccess = true
-                },
-                userName: userManager.currentUser?.name ?? ""
+                }
             )
             .navigationTitle("New Game")
             .navigationBarTitleDisplayMode(.inline)

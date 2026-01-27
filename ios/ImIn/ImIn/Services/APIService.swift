@@ -25,14 +25,8 @@ final class APIService: Sendable {
 
     private init() {}
 
-    // IMPORTANT: Change this to your server's IP when testing on device
-    // Use localhost for simulator, your Mac's IP for physical device
-    #if targetEnvironment(simulator)
-    private let baseURL = "http://localhost:3000"
-    #else
-    // Replace with your Mac's local IP address (e.g., "http://192.168.1.100:3000")
-    private let baseURL = "http://localhost:3000"
-    #endif
+    // Production API
+    private let baseURL = "https://imin-production.up.railway.app"
 
     private var decoder: JSONDecoder { JSONDecoder() }
     private var encoder: JSONEncoder { JSONEncoder() }

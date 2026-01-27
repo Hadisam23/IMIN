@@ -134,6 +134,10 @@ router.post('/:id/join', (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
+    if (!phone || phone.trim() === '') {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
     const game = db.games.get(gameId);
 
     if (!game) {
@@ -142,6 +146,13 @@ router.post('/:id/join', (req, res) => {
 
     if (game.status === 'locked') {
       return res.status(400).json({ error: 'Game is locked' });
+    }
+
+    // Check if phone already exists in this game
+    const existingPlayers = getJoinedPlayers(gameId);
+    const phoneExists = existingPlayers.some(p => p.phone === phone.trim());
+    if (phoneExists) {
+      return res.status(400).json({ error: 'This phone number is already registered for this game' });
     }
 
     const currentCount = getPlayerCount(gameId);
@@ -155,7 +166,7 @@ router.post('/:id/join', (req, res) => {
     const player = {
       id: playerId,
       name: name.trim(),
-      phone: phone || null
+      phone: phone.trim()
     };
     db.players.set(playerId, player);
 
