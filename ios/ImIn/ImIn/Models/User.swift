@@ -4,13 +4,15 @@ import Foundation
 struct User: Codable, Identifiable {
     let id: String
     var name: String
+    var phone: String
     var location: String
     var sports: [UserSport]
     var freeTimeSlots: [FreeTimeSlot]
 
-    init(id: String = UUID().uuidString, name: String, location: String = "", sports: [UserSport] = [], freeTimeSlots: [FreeTimeSlot] = []) {
+    init(id: String = UUID().uuidString, name: String, phone: String = "", location: String = "", sports: [UserSport] = [], freeTimeSlots: [FreeTimeSlot] = []) {
         self.id = id
         self.name = name
+        self.phone = phone
         self.location = location
         self.sports = sports
         self.freeTimeSlots = freeTimeSlots

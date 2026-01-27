@@ -11,6 +11,8 @@ struct Game: Codable, Identifiable {
     var joinUrl: String?
     var players: [Player]?
     var playerCount: Int?
+    var isPublic: Bool?
+    var isCreator: Bool?
 
     var currentPlayers: Int {
         playerCount ?? players?.count ?? 0
@@ -82,6 +84,8 @@ struct CreateGameRequest: Codable {
     let location: String
     let level: String
     let maxPlayers: Int
+    let isPublic: Bool
+    let creatorPhone: String?
 }
 
 struct UpdateGameRequest: Codable {

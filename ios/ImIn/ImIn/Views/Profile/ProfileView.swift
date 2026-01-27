@@ -4,6 +4,11 @@ struct ProfileView: View {
     @EnvironmentObject var userManager: UserManager
     @State private var isEditingSports = false
     @State private var showAddFreeTime = false
+    @State private var myGames: [Game] = []
+    @State private var isLoadingGames = false
+    @State private var selectedGame: Game?
+
+    private let api = APIService.shared
 
     var body: some View {
         NavigationStack {
@@ -11,6 +16,9 @@ struct ProfileView: View {
                 VStack(spacing: 24) {
                     // Profile Header
                     profileHeader
+
+                    // My Games
+                    myGamesSection
 
                     // My Sports & Levels
                     sportsSection
@@ -28,6 +36,37 @@ struct ProfileView: View {
             .sheet(isPresented: $showAddFreeTime) {
                 AddFreeTimeView()
             }
+            .sheet(item: $selectedGame) { game in
+                GameDashboardView(gameId: game.id)
+            }
+            .onAppear {
+                loadMyGames()
+            }
+            .refreshable {
+                await refreshMyGames()
+            }
+        }
+    }
+
+    private func loadMyGames() {
+        guard let phone = userManager.currentUser?.phone else { return }
+        isLoadingGames = true
+        Task {
+            do {
+                myGames = try await api.fetchMyGames(phone: phone)
+            } catch {
+                print("Failed to load games: \(error)")
+            }
+            isLoadingGames = false
+        }
+    }
+
+    private func refreshMyGames() async {
+        guard let phone = userManager.currentUser?.phone else { return }
+        do {
+            myGames = try await api.fetchMyGames(phone: phone)
+        } catch {
+            print("Failed to refresh games: \(error)")
         }
     }
 
@@ -68,6 +107,40 @@ struct ProfileView: View {
         .padding(.vertical, 24)
         .background(Color(.systemBackground))
         .cornerRadius(16)
+    }
+
+    // MARK: - My Games Section
+
+    private var myGamesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("MY GAMES")
+                    .fieldLabel()
+
+                Spacer()
+
+                if isLoadingGames {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+
+            if myGames.isEmpty && !isLoadingGames {
+                emptyStateCard(
+                    icon: "sportscourt.fill",
+                    message: "No upcoming games",
+                    action: { }
+                )
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(myGames) { game in
+                        MyGameCard(game: game, isCreator: game.isCreator ?? false) {
+                            selectedGame = game
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Sports Section
@@ -235,6 +308,105 @@ struct FreeTimeSlotRow: View {
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(10)
+    }
+}
+
+// MARK: - My Game Card
+
+struct MyGameCard: View {
+    let game: Game
+    let isCreator: Bool
+    let onTap: () -> Void
+
+    private var sportIcon: String {
+        switch game.sport.lowercased() {
+        case "football": return "figure.soccer"
+        case "padel": return "figure.racquetball"
+        case "tennis": return "figure.tennis"
+        case "basketball": return "figure.basketball"
+        default: return "sportscourt.fill"
+        }
+    }
+
+    private var statusColor: Color {
+        switch game.status {
+        case .open: return .successGreen
+        case .full: return .warningOrange
+        case .locked: return .secondary
+        case .cancelled: return .errorRed
+        }
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Sport icon
+                ZStack {
+                    Circle()
+                        .fill(Color.accentBlue.opacity(0.1))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: sportIcon)
+                        .font(.system(size: 18))
+                        .foregroundColor(.accentBlue)
+                }
+
+                // Game details
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(game.sport)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        if isCreator {
+                            Text("ORGANIZER")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.accentBlue)
+                                .cornerRadius(4)
+                        }
+                    }
+
+                    Text(game.formattedTime)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Text(game.location)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                // Status and player count
+                VStack(alignment: .trailing, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 8, height: 8)
+                        Text(game.status.displayText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text("\(game.currentPlayers)/\(game.maxPlayers)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
     }
 }
 

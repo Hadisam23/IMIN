@@ -3,10 +3,16 @@ import SwiftUI
 struct SignInView: View {
     @EnvironmentObject var userManager: UserManager
     @State private var name = ""
-    @FocusState private var isNameFocused: Bool
+    @State private var phone = ""
+    @FocusState private var focusedField: Field?
+
+    enum Field {
+        case name, phone
+    }
 
     private var canContinue: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty
+        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !phone.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
@@ -18,10 +24,10 @@ struct SignInView: View {
                 ZStack {
                     Circle()
                         .fill(Color.accentBlue.opacity(0.1))
-                        .frame(width: 120, height: 120)
+                        .frame(width: 100, height: 100)
 
                     Image(systemName: "sportscourt.fill")
-                        .font(.system(size: 48))
+                        .font(.system(size: 40))
                         .foregroundColor(.accentBlue)
                 }
 
@@ -36,25 +42,40 @@ struct SignInView: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            .padding(.bottom, 48)
+            .padding(.bottom, 32)
 
-            // Name input
-            VStack(alignment: .leading, spacing: 12) {
-                Text("What's your name?")
-                    .font(.headline)
+            // Name & Phone input
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your name")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
 
-                TextField("Enter your name", text: $name)
-                    .font(.body)
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(12)
-                    .focused($isNameFocused)
-                    .submitLabel(.continue)
-                    .onSubmit {
-                        if canContinue {
-                            continueToOnboarding()
+                    TextField("Enter your name", text: $name)
+                        .font(.body)
+                        .padding()
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(12)
+                        .focused($focusedField, equals: .name)
+                        .submitLabel(.next)
+                        .onSubmit {
+                            focusedField = .phone
                         }
-                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Phone number")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    TextField("Your phone number", text: $phone)
+                        .font(.body)
+                        .padding()
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(12)
+                        .keyboardType(.phonePad)
+                        .focused($focusedField, equals: .phone)
+                }
             }
             .padding(.horizontal, 24)
 
@@ -93,7 +114,7 @@ struct SignInView: View {
         }
         .background(Color(.systemBackground))
         .onAppear {
-            isNameFocused = true
+            focusedField = .name
         }
     }
 
@@ -118,7 +139,8 @@ struct SignInView: View {
 
     private func continueToOnboarding() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        userManager.signIn(name: trimmedName)
+        let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
+        userManager.signIn(name: trimmedName, phone: trimmedPhone)
     }
 }
 

@@ -22,6 +22,7 @@ struct CreateGameView: View {
     @State private var createdGame: Game?
     @State private var showShareSheet = false
     @State private var imPlaying = true
+    @State private var isPublic = false
 
     private let sports = ["Football", "Padel", "Tennis", "Basketball"]
     private let levels = ["Beginner", "Intermediate", "Advanced", "Pro"]
@@ -127,6 +128,9 @@ struct CreateGameView: View {
 
                 // I'm Playing Toggle
                 organizerSection
+
+                // Visibility Toggle
+                visibilitySection
 
                 // Create Button
                 createButton
@@ -292,6 +296,30 @@ struct CreateGameView: View {
         .cornerRadius(12)
     }
 
+    // MARK: - Visibility Section
+    private var visibilitySection: some View {
+        Toggle(isOn: $isPublic) {
+            HStack(spacing: 12) {
+                Image(systemName: isPublic ? "globe" : "lock.fill")
+                    .font(.title3)
+                    .foregroundColor(isPublic ? .accentBlue : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isPublic ? "Public Game" : "Private Game")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text(isPublic ? "Visible in Discover" : "Only accessible via link")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .tint(.accentBlue)
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
     // MARK: - Create Button
     private var createButton: some View {
         VStack(spacing: 8) {
@@ -417,11 +445,14 @@ struct CreateGameView: View {
                     time: combinedDateTime,
                     location: location,
                     level: level,
-                    maxPlayers: maxPlayers
+                    maxPlayers: maxPlayers,
+                    isPublic: isPublic,
+                    creatorPhone: userManager.currentUser?.phone
                 )
 
-                if imPlaying, let userName = userManager.currentUser?.name {
-                    game = try await api.joinGame(id: game.id, name: userName)
+                if imPlaying, let userName = userManager.currentUser?.name,
+                   let userPhone = userManager.currentUser?.phone {
+                    game = try await api.joinGame(id: game.id, name: userName, phone: userPhone)
                 }
 
                 createdGame = game
@@ -549,6 +580,7 @@ struct CreateGameFormView: View {
     @State private var createdGame: Game?
     @State private var showShareSheet = false
     @State private var imPlaying = true
+    @State private var isPublic = false
 
     private let sports = ["Football", "Padel", "Tennis", "Basketball"]
     private let levels = ["Beginner", "Intermediate", "Advanced", "Pro"]
@@ -625,6 +657,9 @@ struct CreateGameFormView: View {
 
                 // I'm Playing Toggle
                 organizerSection
+
+                // Visibility Toggle
+                visibilitySection
 
                 // Create Button
                 createButton
@@ -786,6 +821,30 @@ struct CreateGameFormView: View {
         .cornerRadius(12)
     }
 
+    // MARK: - Visibility Section
+    private var visibilitySection: some View {
+        Toggle(isOn: $isPublic) {
+            HStack(spacing: 12) {
+                Image(systemName: isPublic ? "globe" : "lock.fill")
+                    .font(.title3)
+                    .foregroundColor(isPublic ? .accentBlue : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isPublic ? "Public Game" : "Private Game")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text(isPublic ? "Visible in Discover" : "Only accessible via link")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .tint(.accentBlue)
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
     // MARK: - Create Button
     private var createButton: some View {
         VStack(spacing: 8) {
@@ -913,11 +972,14 @@ struct CreateGameFormView: View {
                     time: combinedDateTime,
                     location: location,
                     level: level,
-                    maxPlayers: maxPlayers
+                    maxPlayers: maxPlayers,
+                    isPublic: isPublic,
+                    creatorPhone: userManager.currentUser?.phone
                 )
 
-                if imPlaying, let userName = userManager.currentUser?.name {
-                    game = try await api.joinGame(id: game.id, name: userName)
+                if imPlaying, let userName = userManager.currentUser?.name,
+                   let userPhone = userManager.currentUser?.phone {
+                    game = try await api.joinGame(id: game.id, name: userName, phone: userPhone)
                 }
 
                 createdGame = game

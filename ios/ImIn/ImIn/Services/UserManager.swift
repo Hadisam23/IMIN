@@ -18,8 +18,8 @@ class UserManager: ObservableObject {
 
     // MARK: - Authentication
 
-    func signIn(name: String) {
-        let user = User(name: name)
+    func signIn(name: String, phone: String) {
+        let user = User(name: name, phone: phone)
         currentUser = user
         isAuthenticated = true
         saveUser()

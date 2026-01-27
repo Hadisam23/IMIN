@@ -56,6 +56,30 @@ final class APIService: Sendable {
         }
     }
 
+    func fetchMyGames(phone: String) async throws -> [Game] {
+        guard let encodedPhone = phone.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "\(baseURL)/games/my/\(encodedPhone)") else {
+            throw APIError.invalidURL
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode >= 400 {
+                throw APIError.serverError("Failed to fetch your games")
+            }
+
+            return try decoder.decode([Game].self, from: data)
+        } catch let error as APIError {
+            throw error
+        } catch let error as DecodingError {
+            throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
     func fetchGame(id: String) async throws -> Game {
         guard let url = URL(string: "\(baseURL)/games/\(id)") else {
             throw APIError.invalidURL
@@ -84,7 +108,7 @@ final class APIService: Sendable {
         }
     }
 
-    func createGame(sport: String, time: Date, location: String, level: String, maxPlayers: Int) async throws -> Game {
+    func createGame(sport: String, time: Date, location: String, level: String, maxPlayers: Int, isPublic: Bool = false, creatorPhone: String? = nil) async throws -> Game {
         guard let url = URL(string: "\(baseURL)/games") else {
             throw APIError.invalidURL
         }
@@ -101,7 +125,9 @@ final class APIService: Sendable {
             time: timeString,
             location: location,
             level: level,
-            maxPlayers: maxPlayers
+            maxPlayers: maxPlayers,
+            isPublic: isPublic,
+            creatorPhone: creatorPhone
         )
 
         request.httpBody = try encoder.encode(body)

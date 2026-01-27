@@ -39,7 +39,7 @@ function updateGameStatus(gameId) {
 // POST /games - Create a new game
 router.post('/', (req, res) => {
   try {
-    const { sport, time, location, level, maxPlayers } = req.body;
+    const { sport, time, location, level, maxPlayers, isPublic, creatorPhone } = req.body;
 
     if (!sport || !time || !location || !level || !maxPlayers) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -53,6 +53,8 @@ router.post('/', (req, res) => {
       location,
       level,
       maxPlayers,
+      isPublic: isPublic || false,
+      creatorPhone: creatorPhone || null,
       status: 'open',
       createdAt: new Date().toISOString()
     };
@@ -74,7 +76,7 @@ router.post('/', (req, res) => {
   }
 });
 
-// GET /games - List all games
+// GET /games - List public games only (for Discover)
 router.get('/', (req, res) => {
   try {
     const now = new Date();
@@ -83,7 +85,8 @@ router.get('/', (req, res) => {
     const games = [];
     for (const [id, game] of db.games) {
       const gameTime = new Date(game.time);
-      if (gameTime >= twoHoursAgo) {
+      // Only show public games in the main list
+      if (gameTime >= twoHoursAgo && game.isPublic) {
         games.push({
           ...game,
           playerCount: getPlayerCount(game.id),
@@ -97,6 +100,43 @@ router.get('/', (req, res) => {
   } catch (error) {
     console.error('List games error:', error);
     res.status(500).json({ error: 'Failed to fetch games' });
+  }
+});
+
+// GET /games/my/:phone - List games created by or joined by a phone number
+router.get('/my/:phone', (req, res) => {
+  try {
+    const phone = req.params.phone;
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+    const myGames = [];
+    for (const [id, game] of db.games) {
+      const gameTime = new Date(game.time);
+      if (gameTime < twoHoursAgo) continue;
+
+      // Check if user created this game
+      const isCreator = game.creatorPhone === phone;
+
+      // Check if user joined this game
+      const players = getJoinedPlayers(game.id);
+      const isPlayer = players.some(p => p.phone === phone);
+
+      if (isCreator || isPlayer) {
+        myGames.push({
+          ...game,
+          playerCount: getPlayerCount(game.id),
+          players,
+          isCreator
+        });
+      }
+    }
+
+    myGames.sort((a, b) => new Date(a.time) - new Date(b.time));
+    res.json(myGames);
+  } catch (error) {
+    console.error('List my games error:', error);
+    res.status(500).json({ error: 'Failed to fetch your games' });
   }
 });
 
