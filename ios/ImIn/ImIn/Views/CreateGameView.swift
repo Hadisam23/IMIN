@@ -740,27 +740,12 @@ struct CreateGameFormView: View {
                 Text("MAX PLAYERS")
                     .fieldLabel()
 
-                Menu {
-                    ForEach([4, 6, 8, 10, 12, 14, 16, 18, 20, 22], id: \.self) { count in
-                        Button {
-                            customMaxPlayers = count
-                        } label: {
-                            Text("\(count)")
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Text("\(maxPlayers)")
-                            .font(.title3)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                TextField("10", value: $customMaxPlayers, format: .number)
+                    .font(.title3)
+                    .fontWeight(.medium)
+                    .keyboardType(.numberPad)
                     .padding(.vertical, 8)
-                }
+                    .multilineTextAlignment(.leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
