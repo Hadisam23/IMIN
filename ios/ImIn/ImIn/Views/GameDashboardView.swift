@@ -90,7 +90,7 @@ struct GameDashboardView: View {
             if let game = game, let players = game.players {
                 TeamSplitView(
                     gameId: gameId,
-                    playersPerTeam: extractPlayersPerTeam(from: game.sport),
+                    initialPlayersPerTeam: extractPlayersPerTeam(from: game.sport, maxPlayers: game.maxPlayers),
                     players: Binding(
                         get: { players },
                         set: { _ in }
@@ -100,7 +100,7 @@ struct GameDashboardView: View {
         }
     }
 
-    private func extractPlayersPerTeam(from sport: String) -> Int {
+    private func extractPlayersPerTeam(from sport: String, maxPlayers: Int) -> Int {
         // Extract number from sport format like "5v5", "11v11", etc.
         let pattern = #"(\d+)v\d+"#
         if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
@@ -109,8 +109,18 @@ struct GameDashboardView: View {
            let number = Int(sport[range]) {
             return number
         }
-        // Default to half the players if format not recognized
-        return max(2, (game?.maxPlayers ?? 10) / 2)
+
+        // Try to find a sensible team size based on maxPlayers
+        // Common formats: 5v5=10, 6v6=12, 7v7=14, 11v11=22, 3v3=6, 4v4=8
+        let commonTeamSizes = [11, 7, 6, 5, 4, 3]
+        for size in commonTeamSizes {
+            if maxPlayers % size == 0 && maxPlayers / size >= 2 {
+                return size
+            }
+        }
+
+        // Default: assume 2 teams
+        return max(2, maxPlayers / 2)
     }
 
     private var loadingView: some View {

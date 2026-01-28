@@ -355,6 +355,151 @@
       text-decoration: none;
       font-weight: 500;
     }
+
+    /* Confirmed State */
+    .confirmed-state {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .confirmed-icon {
+      width: 64px;
+      height: 64px;
+      background: var(--success-green);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 32px;
+      color: #fff;
+    }
+
+    .confirmed-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .confirmed-name {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      margin-bottom: 4px;
+    }
+
+    .confirmed-subtitle {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+      font-size: 15px;
+      padding: 12px;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--bg-primary);
+    }
+
+    /* Dropped State */
+    .dropped-state {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .dropped-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .dropped-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+
+    .dropped-subtitle {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    /* Confirm Dialog */
+    .confirm-dialog {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 24px 20px;
+      text-align: center;
+    }
+
+    .confirm-dialog h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .confirm-dialog p {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .confirm-dialog .btn-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .confirm-dialog .btn {
+      flex: 1;
+    }
+
+    .btn-danger {
+      background: var(--error-red);
+      color: #fff;
+    }
+
+    .btn-cancel {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    /* Highlight current player in list */
+    .player-item.you {
+      background: rgba(75, 107, 251, 0.08);
+      margin: 0 -10px;
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    .player-item.you .player-name::after {
+      content: ' (You)';
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -426,11 +571,32 @@
 
           <div class="form-group">
             <label class="form-label">Phone Number</label>
-            <input type="tel" class="form-input" id="phone-input" placeholder="Your phone number" required>
+            <input type="tel" class="form-input" id="phone-input" placeholder="10-digit phone number" maxlength="14" required>
           </div>
 
           <button type="submit" class="btn btn-primary" id="join-btn">I'm In!</button>
         </form>
+      </div>
+
+      <!-- Confirmed State Card (hidden by default) -->
+      <div class="card hidden" id="confirmed-card">
+        <div class="confirmed-state">
+          <div class="confirmed-icon">✓</div>
+          <h2 class="confirmed-title">You're In!</h2>
+          <p class="confirmed-name" id="confirmed-name"></p>
+          <p class="confirmed-subtitle">See you at the game</p>
+        </div>
+        <button class="btn btn-secondary" id="cant-make-it-btn">Can't make it anymore?</button>
+      </div>
+
+      <!-- Dropped State Card (hidden by default) -->
+      <div class="card hidden" id="dropped-card">
+        <div class="dropped-state">
+          <div class="dropped-icon">👋</div>
+          <h2 class="dropped-title">You've Dropped Out</h2>
+          <p class="dropped-subtitle">Your spot has been freed for someone else</p>
+        </div>
+        <button class="btn btn-primary" id="rejoin-btn">Changed your mind? Rejoin</button>
       </div>
     </div>
 
@@ -439,11 +605,25 @@
     </div>
   </div>
 
+  <!-- Confirmation Dialog Overlay -->
+  <div class="overlay hidden" id="confirm-overlay">
+    <div class="confirm-dialog">
+      <h3>Things happen.</h3>
+      <p>This will free your spot so someone else can join.</p>
+      <div class="btn-group">
+        <button class="btn btn-cancel" id="keep-me-btn">Keep me in</button>
+        <button class="btn btn-danger" id="confirm-drop-btn">Drop out</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const gameId = window.location.pathname.split('/').pop();
     const API_BASE = window.location.origin;
+    const STORAGE_KEY = `imin_game_${gameId}`;
 
     let gameData = null;
+    let participationState = null; // { playerId, playerName, phone, status: 'confirmed' | 'dropped' }
 
     // Sport icons mapping
     const sportIcons = {
@@ -464,6 +644,45 @@
     const joinForm = document.getElementById('join-form');
     const joinBtn = document.getElementById('join-btn');
     const messageContainer = document.getElementById('message-container');
+    const confirmedCard = document.getElementById('confirmed-card');
+    const droppedCard = document.getElementById('dropped-card');
+    const confirmOverlay = document.getElementById('confirm-overlay');
+
+    // Load participation state from localStorage
+    function loadParticipationState() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          participationState = JSON.parse(stored);
+          return participationState;
+        }
+      } catch (e) {
+        console.error('Failed to load participation state:', e);
+      }
+      return null;
+    }
+
+    // Save participation state to localStorage
+    function saveParticipationState(state) {
+      try {
+        participationState = state;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.error('Failed to save participation state:', e);
+      }
+    }
+
+    // Clear participation state
+    function clearParticipationState() {
+      participationState = null;
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    // Check if player is still in the game
+    function isPlayerStillInGame(game, playerId) {
+      if (!game.players || !playerId) return false;
+      return game.players.some(p => p.id === playerId);
+    }
 
     // Format date for display
     function formatDate(dateStr) {
@@ -481,6 +700,13 @@
     // Get initials from name
     function getInitials(name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
 
     // Update status badge
@@ -535,34 +761,82 @@
 
       updateStatusBadge(game.status);
 
-      // Render players list
+      // Render players list (highlight current player if registered)
       const playersList = document.getElementById('players-list');
+      const currentPlayerId = participationState?.playerId;
       if (game.players && game.players.length > 0) {
         playersList.innerHTML = game.players.map(player => `
-          <div class="player-item">
-            <div class="player-avatar">${getInitials(player.name)}</div>
-            <span class="player-name">${player.name}</span>
+          <div class="player-item${player.id === currentPlayerId ? ' you' : ''}">
+            <div class="player-avatar">${escapeHtml(getInitials(player.name))}</div>
+            <span class="player-name">${escapeHtml(player.name)}</span>
           </div>
         `).join('');
       } else {
         playersList.innerHTML = '<p class="empty-players">No players yet. Be the first to join!</p>';
       }
 
-      // Show/hide join form based on status
-      if (game.status === 'full' || game.status === 'locked' || game.status === 'cancelled') {
-        joinFormCard.classList.add('hidden');
+      // Determine which card to show based on participation state
+      showAppropriateCard(game);
+    }
 
-        let message = '';
-        if (game.status === 'full') {
-          message = 'This game is full. Check back later for cancellations.';
-        } else if (game.status === 'locked') {
-          message = 'This game has been locked by the organizer.';
+    // Show the appropriate card based on game status and participation state
+    function showAppropriateCard(game) {
+      // Hide all action cards first
+      joinFormCard.classList.add('hidden');
+      confirmedCard.classList.add('hidden');
+      droppedCard.classList.add('hidden');
+
+      // Remove any existing status message cards
+      document.querySelectorAll('.status-message-card').forEach(el => el.remove());
+
+      // Check if player is registered and still in game
+      if (participationState && participationState.status === 'confirmed') {
+        if (isPlayerStillInGame(game, participationState.playerId)) {
+          // Player is confirmed and in the game
+          document.getElementById('confirmed-name').textContent = participationState.playerName;
+          confirmedCard.classList.remove('hidden');
+          return;
         } else {
-          message = 'This game has been cancelled.';
+          // Player was removed (maybe by organizer) - clear state
+          clearParticipationState();
         }
+      }
 
+      // Check if player previously dropped out
+      if (participationState && participationState.status === 'dropped') {
+        // Show dropped state with rejoin option (if game is open)
+        if (game.status === 'open') {
+          droppedCard.classList.remove('hidden');
+        } else {
+          // Can't rejoin, clear state and show status message
+          clearParticipationState();
+          showStatusMessage(game);
+        }
+        return;
+      }
+
+      // No participation state - show join form or status message
+      if (game.status === 'open') {
+        joinFormCard.classList.remove('hidden');
+      } else {
+        showStatusMessage(game);
+      }
+    }
+
+    // Show status message for closed games
+    function showStatusMessage(game) {
+      let message = '';
+      if (game.status === 'full') {
+        message = 'This game is full. Check back later for cancellations.';
+      } else if (game.status === 'locked') {
+        message = 'This game has been locked by the organizer.';
+      } else if (game.status === 'cancelled') {
+        message = 'This game has been cancelled.';
+      }
+
+      if (message) {
         const msgCard = document.createElement('div');
-        msgCard.className = 'card';
+        msgCard.className = 'card status-message-card';
         msgCard.innerHTML = `<div class="message error">${message}</div>`;
         joinFormCard.parentNode.insertBefore(msgCard, joinFormCard);
       }
@@ -571,6 +845,9 @@
     // Fetch game data
     async function fetchGame() {
       try {
+        // Load any existing participation state first
+        loadParticipationState();
+
         const response = await fetch(`${API_BASE}/games/${gameId}`);
 
         if (!response.ok) {
@@ -578,6 +855,14 @@
         }
 
         const game = await response.json();
+
+        // If we have a participation state, verify player is still in game
+        if (participationState && participationState.status === 'confirmed') {
+          if (!isPlayerStillInGame(game, participationState.playerId)) {
+            // Player was removed - clear the state
+            clearParticipationState();
+          }
+        }
 
         loadingEl.classList.add('hidden');
         gameContentEl.classList.remove('hidden');
@@ -590,7 +875,7 @@
       }
     }
 
-    // Handle form submission
+    // Handle form submission (join game)
     joinForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -604,6 +889,13 @@
 
       if (!phone) {
         messageContainer.innerHTML = '<div class="message error">Please enter your phone number</div>';
+        return;
+      }
+
+      // Validate phone is exactly 10 digits
+      const digitsOnly = phone.replace(/\D/g, '');
+      if (digitsOnly.length !== 10) {
+        messageContainer.innerHTML = '<div class="message error">Phone number must be exactly 10 digits</div>';
         return;
       }
 
@@ -623,19 +915,90 @@
           throw new Error(data.error || 'Failed to join');
         }
 
-        // Success
-        messageContainer.innerHTML = `<div class="message success">${data.message}</div>`;
-        joinForm.classList.add('hidden');
+        // Find the player ID from the response
+        const joinedPlayer = data.game?.players?.find(p => p.phone === phone);
+        if (joinedPlayer) {
+          // Save participation state
+          saveParticipationState({
+            playerId: joinedPlayer.id,
+            playerName: name,
+            phone: phone,
+            status: 'confirmed'
+          });
+        }
+
+        // Update game display (this will show the confirmed card)
+        if (data.game) {
+          renderGame(data.game);
+        }
+      } catch (error) {
+        messageContainer.innerHTML = `<div class="message error">${escapeHtml(error.message)}</div>`;
+        joinBtn.disabled = false;
+        joinBtn.textContent = "I'm In!";
+      }
+    });
+
+    // Handle "Can't make it" button
+    document.getElementById('cant-make-it-btn').addEventListener('click', () => {
+      confirmOverlay.classList.remove('hidden');
+    });
+
+    // Handle "Keep me in" button
+    document.getElementById('keep-me-btn').addEventListener('click', () => {
+      confirmOverlay.classList.add('hidden');
+    });
+
+    // Handle confirm drop out
+    document.getElementById('confirm-drop-btn').addEventListener('click', async () => {
+      if (!participationState || !participationState.playerId) {
+        confirmOverlay.classList.add('hidden');
+        return;
+      }
+
+      const dropBtn = document.getElementById('confirm-drop-btn');
+      dropBtn.disabled = true;
+      dropBtn.textContent = 'Dropping...';
+
+      try {
+        const response = await fetch(`${API_BASE}/games/${gameId}/players/${participationState.playerId}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to drop out');
+        }
+
+        // Update state to dropped
+        saveParticipationState({
+          ...participationState,
+          status: 'dropped'
+        });
+
+        confirmOverlay.classList.add('hidden');
 
         // Update game display
         if (data.game) {
           renderGame(data.game);
         }
       } catch (error) {
-        messageContainer.innerHTML = `<div class="message error">${error.message}</div>`;
-        joinBtn.disabled = false;
-        joinBtn.textContent = "I'm In!";
+        alert(error.message);
+        dropBtn.disabled = false;
+        dropBtn.textContent = 'Drop out';
       }
+    });
+
+    // Handle rejoin button
+    document.getElementById('rejoin-btn').addEventListener('click', () => {
+      // Clear the dropped state and show join form
+      clearParticipationState();
+      droppedCard.classList.add('hidden');
+      joinFormCard.classList.remove('hidden');
+
+      // Pre-fill the form with previous data if available
+      // (Note: we cleared the state, so this won't work. For better UX,
+      //  we could store name/phone separately)
     });
 
     // Initial load

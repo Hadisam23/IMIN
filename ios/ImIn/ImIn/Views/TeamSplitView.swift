@@ -2,7 +2,7 @@ import SwiftUI
 
 struct TeamSplitView: View {
     let gameId: String
-    let playersPerTeam: Int
+    let initialPlayersPerTeam: Int
     @Binding var players: [Player]
 
     @Environment(\.dismiss) private var dismiss
@@ -11,10 +11,17 @@ struct TeamSplitView: View {
     @State private var teams: [[Player]] = []
     @State private var selectedPlayer: Player?
     @State private var showingUnassignedWarning = false
+    @State private var numberOfTeams: Int = 2
 
-    private var numberOfTeams: Int {
-        guard playersPerTeam > 0 else { return 2 }
-        return max(2, players.count / playersPerTeam)
+    private var playersPerTeam: Int {
+        guard numberOfTeams > 0 else { return players.count }
+        return (players.count + numberOfTeams - 1) / numberOfTeams // Round up
+    }
+
+    private var possibleTeamCounts: [Int] {
+        // Offer 2, 3, 4 teams or more based on player count
+        let maxTeams = min(players.count / 2, 6) // At least 2 per team, max 6 teams
+        return Array(2...max(2, maxTeams))
     }
 
     private var teamColors: [Color] {
@@ -54,6 +61,10 @@ struct TeamSplitView: View {
                 }
             }
             .onAppear {
+                // Calculate initial number of teams based on players per team
+                if initialPlayersPerTeam > 0 {
+                    numberOfTeams = max(2, players.count / initialPlayersPerTeam)
+                }
                 if teams.isEmpty {
                     splitTeams()
                 }
@@ -70,31 +81,54 @@ struct TeamSplitView: View {
     }
 
     private var teamTotalsHeader: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(Array(teams.enumerated()), id: \.offset) { index, team in
-                    VStack(spacing: 4) {
-                        Text("Team \(index + 1)")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(teamColors[index % teamColors.count])
+        VStack(spacing: 12) {
+            // Team count picker
+            HStack {
+                Text("Teams:")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
 
-                        Text("\(teamTotal(team))")
-                            .font(.title2)
-                            .fontWeight(.bold)
-
-                        Text("\(team.count) players")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                Picker("Number of teams", selection: $numberOfTeams) {
+                    ForEach(possibleTeamCounts, id: \.self) { count in
+                        Text("\(count) teams").tag(count)
                     }
-                    .frame(minWidth: 80)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 16)
-                    .background(teamColors[index % teamColors.count].opacity(0.1))
-                    .cornerRadius(12)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: numberOfTeams) { _, _ in
+                    performSplit()
                 }
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 12)
+
+            // Team totals
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(Array(teams.enumerated()), id: \.offset) { index, team in
+                        VStack(spacing: 4) {
+                            Text("Team \(index + 1)")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(teamColors[index % teamColors.count])
+
+                            Text("\(teamTotal(team))")
+                                .font(.title2)
+                                .fontWeight(.bold)
+
+                            Text("\(team.count) players")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(minWidth: 80)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .background(teamColors[index % teamColors.count].opacity(0.1))
+                        .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 12)
+            }
         }
         .background(Color(.systemBackground))
     }
@@ -295,7 +329,7 @@ struct TeamSplitView: View {
 #Preview {
     TeamSplitView(
         gameId: "test",
-        playersPerTeam: 5,
+        initialPlayersPerTeam: 5,
         players: .constant([
             Player(id: "1", name: "John Doe", phone: nil, timestamp: nil, skillLevel: 5),
             Player(id: "2", name: "Jane Smith", phone: nil, timestamp: nil, skillLevel: 4),

@@ -182,6 +182,12 @@ router.post('/:id/join', (req, res) => {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
+    // Validate phone is exactly 10 digits
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+      return res.status(400).json({ error: 'Phone number must be exactly 10 digits' });
+    }
+
     const game = db.games.get(gameId);
 
     if (!game) {
@@ -318,6 +324,49 @@ router.patch('/:id/players/:playerId', (req, res) => {
   } catch (error) {
     console.error('Update player skill error:', error);
     res.status(500).json({ error: 'Failed to update player skill' });
+  }
+});
+
+// DELETE /games/:id/players/:playerId - Remove player from game (deregister)
+router.delete('/:id/players/:playerId', (req, res) => {
+  try {
+    const gameId = req.params.id;
+    const playerId = req.params.playerId;
+
+    const game = db.games.get(gameId);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    const joinKey = `${gameId}:${playerId}`;
+    const join = db.joins.get(joinKey);
+    if (!join) {
+      return res.status(404).json({ error: 'Player not found in this game' });
+    }
+
+    // Remove the join record
+    db.joins.delete(joinKey);
+
+    // Update game status (might go from full to open)
+    updateGameStatus(gameId);
+
+    const updatedGame = db.games.get(gameId);
+    const players = getJoinedPlayers(gameId);
+    const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
+
+    res.json({
+      success: true,
+      message: 'You have been removed from this game',
+      game: {
+        ...updatedGame,
+        joinUrl: `${baseUrl}/join/${gameId}`,
+        players,
+        playerCount: players.length
+      }
+    });
+  } catch (error) {
+    console.error('Remove player error:', error);
+    res.status(500).json({ error: 'Failed to remove player' });
   }
 });
 
