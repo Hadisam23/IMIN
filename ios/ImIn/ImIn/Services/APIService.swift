@@ -236,6 +236,40 @@ final class APIService: Sendable {
         }
     }
 
+    func updatePlayerSkillLevel(gameId: String, playerId: String, skillLevel: Int) async throws -> Game {
+        guard let url = URL(string: "\(baseURL)/games/\(gameId)/players/\(playerId)") else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body = ["skillLevel": skillLevel]
+        request.httpBody = try encoder.encode(body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode >= 400 {
+                if let errorResponse = try? JSONDecoder().decode([String: String].self, from: data),
+                   let errorMessage = errorResponse["error"] {
+                    throw APIError.serverError(errorMessage)
+                }
+                throw APIError.serverError("Failed to update player skill")
+            }
+
+            return try decoder.decode(Game.self, from: data)
+        } catch let error as APIError {
+            throw error
+        } catch let error as DecodingError {
+            throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
     func joinGame(id: String, name: String, phone: String? = nil) async throws -> Game {
         guard let url = URL(string: "\(baseURL)/games/\(id)/join") else {
             throw APIError.invalidURL

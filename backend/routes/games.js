@@ -11,7 +11,11 @@ function getJoinedPlayers(gameId) {
     if (join.gameId === gameId) {
       const player = db.players.get(join.playerId);
       if (player) {
-        players.push({ ...player, timestamp: join.timestamp });
+        players.push({
+          ...player,
+          timestamp: join.timestamp,
+          skillLevel: join.skillLevel || null
+        });
       }
     }
   }
@@ -273,6 +277,47 @@ router.patch('/:id', (req, res) => {
   } catch (error) {
     console.error('Update game error:', error);
     res.status(500).json({ error: 'Failed to update game' });
+  }
+});
+
+// PATCH /games/:id/players/:playerId - Update player skill level
+router.patch('/:id/players/:playerId', (req, res) => {
+  try {
+    const { skillLevel } = req.body;
+    const gameId = req.params.id;
+    const playerId = req.params.playerId;
+
+    const game = db.games.get(gameId);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    const joinKey = `${gameId}:${playerId}`;
+    const join = db.joins.get(joinKey);
+    if (!join) {
+      return res.status(404).json({ error: 'Player not found in this game' });
+    }
+
+    // Update skill level (1-5) or null to remove
+    if (skillLevel === null || (skillLevel >= 1 && skillLevel <= 5)) {
+      join.skillLevel = skillLevel;
+      db.joins.set(joinKey, join);
+    } else {
+      return res.status(400).json({ error: 'Skill level must be between 1 and 5' });
+    }
+
+    const players = getJoinedPlayers(gameId);
+    const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
+
+    res.json({
+      ...game,
+      joinUrl: `${baseUrl}/join/${gameId}`,
+      players,
+      playerCount: players.length
+    });
+  } catch (error) {
+    console.error('Update player skill error:', error);
+    res.status(500).json({ error: 'Failed to update player skill' });
   }
 });
 

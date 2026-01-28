@@ -14,6 +14,8 @@ struct GameDashboardView: View {
     @State private var showShareSheet = false
     @State private var showLockConfirm = false
     @State private var showCancelConfirm = false
+    @State private var showTeamSplit = false
+    @State private var editingSkillPlayerId: String?
 
     private let refreshTimer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
@@ -84,6 +86,31 @@ struct GameDashboardView: View {
                 ShareSheet(items: [URL(string: url)!])
             }
         }
+        .sheet(isPresented: $showTeamSplit) {
+            if let game = game, let players = game.players {
+                TeamSplitView(
+                    gameId: gameId,
+                    playersPerTeam: extractPlayersPerTeam(from: game.sport),
+                    players: Binding(
+                        get: { players },
+                        set: { _ in }
+                    )
+                )
+            }
+        }
+    }
+
+    private func extractPlayersPerTeam(from sport: String) -> Int {
+        // Extract number from sport format like "5v5", "11v11", etc.
+        let pattern = #"(\d+)v\d+"#
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+           let match = regex.firstMatch(in: sport, options: [], range: NSRange(sport.startIndex..., in: sport)),
+           let range = Range(match.range(at: 1), in: sport),
+           let number = Int(sport[range]) {
+            return number
+        }
+        // Default to half the players if format not recognized
+        return max(2, (game?.maxPlayers ?? 10) / 2)
     }
 
     private var loadingView: some View {
@@ -263,13 +290,48 @@ struct GameDashboardView: View {
             if let players = game.players, !players.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
-                        PlayerRow(player: player, index: index + 1)
+                        PlayerRowWithSkill(
+                            player: player,
+                            index: index + 1,
+                            isEditing: editingSkillPlayerId == player.id,
+                            onSkillTap: {
+                                if editingSkillPlayerId == player.id {
+                                    editingSkillPlayerId = nil
+                                } else {
+                                    editingSkillPlayerId = player.id
+                                }
+                            },
+                            onSkillChange: { newSkill in
+                                updatePlayerSkill(playerId: player.id, skill: newSkill)
+                                editingSkillPlayerId = nil
+                            }
+                        )
 
                         if index < players.count - 1 {
                             Divider()
                                 .padding(.leading, 52)
                         }
                     }
+                }
+
+                // Split Teams button
+                if players.count >= 4 {
+                    Button {
+                        showTeamSplit = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.2.fill")
+                            Text("Split Teams")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.successGreen)
+                        .cornerRadius(10)
+                    }
+                    .padding(.top, 8)
                 }
             } else {
                 VStack(spacing: 12) {
@@ -296,6 +358,17 @@ struct GameDashboardView: View {
             x: 0,
             y: 2
         )
+    }
+
+    private func updatePlayerSkill(playerId: String, skill: Int) {
+        Task {
+            do {
+                let updatedGame = try await api.updatePlayerSkillLevel(gameId: gameId, playerId: playerId, skillLevel: skill)
+                self.game = updatedGame
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     private func actionsCard(_ game: Game) -> some View {
@@ -431,6 +504,115 @@ struct GameDashboardView: View {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+}
+
+struct PlayerRowWithSkill: View {
+    let player: Player
+    let index: Int
+    let isEditing: Bool
+    let onSkillTap: () -> Void
+    let onSkillChange: (Int) -> Void
+
+    private let colors: [Color] = [.accentBlue, .successGreen, .warningOrange, .purple, .pink, .teal]
+
+    private var avatarColor: Color {
+        colors[(index - 1) % colors.count]
+    }
+
+    private func skillColor(_ level: Int) -> Color {
+        switch level {
+        case 1: return .gray
+        case 2: return .blue
+        case 3: return .green
+        case 4: return .orange
+        case 5: return .red
+        default: return .gray
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Index
+                Text("\(index)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 20)
+
+                // Avatar
+                Circle()
+                    .fill(avatarColor.opacity(0.15))
+                    .frame(width: 40, height: 40)
+                    .overlay(
+                        Text(player.initials)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(avatarColor)
+                    )
+
+                // Name & phone
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(player.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    if let phone = player.phone, !phone.isEmpty {
+                        Text(phone)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Skill level badge (tappable)
+                Button(action: onSkillTap) {
+                    if let skill = player.skillLevel {
+                        Text("\(skill)")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .frame(width: 28, height: 28)
+                            .background(skillColor(skill))
+                            .cornerRadius(8)
+                    } else {
+                        Image(systemName: "star")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(width: 28, height: 28)
+                            .background(Color(.systemGray5))
+                            .cornerRadius(8)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.vertical, 8)
+
+            // Skill picker (when editing)
+            if isEditing {
+                HStack(spacing: 8) {
+                    ForEach(1...5, id: \.self) { level in
+                        Button {
+                            onSkillChange(level)
+                        } label: {
+                            Text("\(level)")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(player.skillLevel == level ? .white : skillColor(level))
+                                .frame(width: 40, height: 36)
+                                .background(player.skillLevel == level ? skillColor(level) : skillColor(level).opacity(0.15))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.leading, 32)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isEditing)
     }
 }
 
