@@ -1,7 +1,13 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'data.db');
+const fs = require('fs');
+
+// Use /data volume if it exists (Railway persistent storage), otherwise local
+const volumeDir = '/data';
+const useVolume = fs.existsSync(volumeDir);
+const dbPath = process.env.DB_PATH || (useVolume ? path.join(volumeDir, 'data.db') : path.join(__dirname, 'data.db'));
+console.log(`Database path: ${dbPath} (volume: ${useVolume})`);
 const db = new Database(dbPath);
 
 // Enable WAL mode for better concurrent read performance
