@@ -4,40 +4,53 @@ const db = require('../db');
 
 const router = express.Router();
 
+// Prepared statements
+const stmts = {
+  insertGame: db.prepare(`INSERT INTO games (id, sport, time, location, level, maxPlayers, isPublic, creatorPhone, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+  getGame: db.prepare(`SELECT * FROM games WHERE id = ?`),
+  updateGameStatus: db.prepare(`UPDATE games SET status = ? WHERE id = ?`),
+  updateGameVisibility: db.prepare(`UPDATE games SET isPublic = ? WHERE id = ?`),
+  deleteGame: db.prepare(`DELETE FROM games WHERE id = ?`),
+  insertPlayer: db.prepare(`INSERT INTO players (id, name, phone) VALUES (?, ?, ?)`),
+  insertJoin: db.prepare(`INSERT INTO joins (gameId, playerId, timestamp, skillLevel) VALUES (?, ?, ?, ?)`),
+  getJoinedPlayers: db.prepare(`SELECT p.id, p.name, p.phone, j.timestamp, j.skillLevel FROM joins j JOIN players p ON p.id = j.playerId WHERE j.gameId = ? ORDER BY j.timestamp`),
+  getPlayerCount: db.prepare(`SELECT COUNT(*) as count FROM joins WHERE gameId = ?`),
+  getJoin: db.prepare(`SELECT * FROM joins WHERE gameId = ? AND playerId = ?`),
+  updateSkillLevel: db.prepare(`UPDATE joins SET skillLevel = ? WHERE gameId = ? AND playerId = ?`),
+  deleteJoin: db.prepare(`DELETE FROM joins WHERE gameId = ? AND playerId = ?`),
+  deleteGameJoins: db.prepare(`DELETE FROM joins WHERE gameId = ?`),
+  getPublicGames: db.prepare(`SELECT * FROM games WHERE isPublic = 1 AND time >= ?`),
+  getGamesByCreator: db.prepare(`SELECT * FROM games WHERE creatorPhone = ? AND time >= ?`),
+  getAllRecentGames: db.prepare(`SELECT * FROM games WHERE time >= ?`),
+  phoneInGame: db.prepare(`SELECT 1 FROM joins j JOIN players p ON p.id = j.playerId WHERE j.gameId = ? AND p.phone = ? LIMIT 1`),
+};
+
 // Helper: Get joined players for a game
 function getJoinedPlayers(gameId) {
-  const players = [];
-  for (const [key, join] of db.joins) {
-    if (join.gameId === gameId) {
-      const player = db.players.get(join.playerId);
-      if (player) {
-        players.push({
-          ...player,
-          timestamp: join.timestamp,
-          skillLevel: join.skillLevel || null
-        });
-      }
-    }
-  }
-  return players.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  return stmts.getJoinedPlayers.all(gameId).map(row => ({
+    ...row,
+    skillLevel: row.skillLevel || null
+  }));
 }
 
 // Helper: Get player count for a game
 function getPlayerCount(gameId) {
-  let count = 0;
-  for (const [key, join] of db.joins) {
-    if (join.gameId === gameId) count++;
-  }
-  return count;
+  return stmts.getPlayerCount.get(gameId).count;
 }
 
 // Helper: Update game status based on player count
 function updateGameStatus(gameId) {
-  const game = db.games.get(gameId);
+  const game = stmts.getGame.get(gameId);
   if (!game || game.status === 'locked') return;
 
   const count = getPlayerCount(gameId);
-  game.status = count >= game.maxPlayers ? 'full' : 'open';
+  const newStatus = count >= game.maxPlayers ? 'full' : 'open';
+  stmts.updateGameStatus.run(newStatus, gameId);
+}
+
+// Helper: format game row (isPublic int -> bool)
+function formatGame(row) {
+  return { ...row, isPublic: !!row.isPublic };
 }
 
 // POST /games - Create a new game
@@ -50,26 +63,19 @@ router.post('/', (req, res) => {
     }
 
     const id = uuidv4();
-    const game = {
-      id,
-      sport,
-      time,
-      location,
-      level,
-      maxPlayers,
-      isPublic: isPublic || false,
-      creatorPhone: creatorPhone || null,
-      status: 'open',
-      createdAt: new Date().toISOString()
-    };
+    const createdAt = new Date().toISOString();
 
-    db.games.set(id, game);
+    stmts.insertGame.run(id, sport, time, location, level, maxPlayers, isPublic ? 1 : 0, creatorPhone || null, 'open', createdAt);
 
     const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
     const joinUrl = `${baseUrl}/join/${id}`;
 
     res.status(201).json({
-      ...game,
+      id, sport, time, location, level, maxPlayers,
+      isPublic: isPublic || false,
+      creatorPhone: creatorPhone || null,
+      status: 'open',
+      createdAt,
       joinUrl,
       players: [],
       playerCount: 0
@@ -83,21 +89,13 @@ router.post('/', (req, res) => {
 // GET /games - List public games only (for Discover)
 router.get('/', (req, res) => {
   try {
-    const now = new Date();
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
-    const games = [];
-    for (const [id, game] of db.games) {
-      const gameTime = new Date(game.time);
-      // Only show public games in the main list
-      if (gameTime >= twoHoursAgo && game.isPublic) {
-        games.push({
-          ...game,
-          playerCount: getPlayerCount(game.id),
-          players: getJoinedPlayers(game.id)
-        });
-      }
-    }
+    const games = stmts.getPublicGames.all(twoHoursAgo).map(row => {
+      const game = formatGame(row);
+      const players = getJoinedPlayers(game.id);
+      return { ...game, playerCount: players.length, players };
+    });
 
     games.sort((a, b) => new Date(a.time) - new Date(b.time));
     res.json(games);
@@ -111,25 +109,21 @@ router.get('/', (req, res) => {
 router.get('/my/:phone', (req, res) => {
   try {
     const phone = req.params.phone;
-    const now = new Date();
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
+    const allGames = stmts.getAllRecentGames.all(twoHoursAgo);
     const myGames = [];
-    for (const [id, game] of db.games) {
-      const gameTime = new Date(game.time);
-      if (gameTime < twoHoursAgo) continue;
 
-      // Check if user created this game
+    for (const row of allGames) {
+      const game = formatGame(row);
       const isCreator = game.creatorPhone === phone;
-
-      // Check if user joined this game
       const players = getJoinedPlayers(game.id);
       const isPlayer = players.some(p => p.phone === phone);
 
       if (isCreator || isPlayer) {
         myGames.push({
           ...game,
-          playerCount: getPlayerCount(game.id),
+          playerCount: players.length,
           players,
           isCreator
         });
@@ -147,12 +141,13 @@ router.get('/my/:phone', (req, res) => {
 // GET /games/:id - Get game details
 router.get('/:id', (req, res) => {
   try {
-    const game = db.games.get(req.params.id);
+    const row = stmts.getGame.get(req.params.id);
 
-    if (!game) {
+    if (!row) {
       return res.status(404).json({ error: 'Game not found' });
     }
 
+    const game = formatGame(row);
     const players = getJoinedPlayers(game.id);
     const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
 
@@ -188,20 +183,20 @@ router.post('/:id/join', (req, res) => {
       return res.status(400).json({ error: 'Phone number must be exactly 10 digits' });
     }
 
-    const game = db.games.get(gameId);
+    const row = stmts.getGame.get(gameId);
 
-    if (!game) {
+    if (!row) {
       return res.status(404).json({ error: 'Game not found' });
     }
+
+    const game = formatGame(row);
 
     if (game.status === 'locked') {
       return res.status(400).json({ error: 'Game is locked' });
     }
 
     // Check if phone already exists in this game
-    const existingPlayers = getJoinedPlayers(gameId);
-    const phoneExists = existingPlayers.some(p => p.phone === phone.trim());
-    if (phoneExists) {
+    if (stmts.phoneInGame.get(gameId, phone.trim())) {
       return res.status(400).json({ error: 'This phone number is already registered for this game' });
     }
 
@@ -211,27 +206,16 @@ router.post('/:id/join', (req, res) => {
       return res.status(400).json({ error: 'Game is full' });
     }
 
-    // Create player
+    // Create player and join in a transaction
     const playerId = uuidv4();
-    const player = {
-      id: playerId,
-      name: name.trim(),
-      phone: phone.trim()
-    };
-    db.players.set(playerId, player);
-
-    // Join game
-    const joinKey = `${gameId}:${playerId}`;
-    db.joins.set(joinKey, {
-      gameId,
-      playerId,
-      timestamp: new Date().toISOString()
+    const joinTransaction = db.transaction(() => {
+      stmts.insertPlayer.run(playerId, name.trim(), phone.trim());
+      stmts.insertJoin.run(gameId, playerId, new Date().toISOString(), null);
+      updateGameStatus(gameId);
     });
+    joinTransaction();
 
-    // Update game status
-    updateGameStatus(gameId);
-
-    const updatedGame = db.games.get(gameId);
+    const updatedGame = formatGame(stmts.getGame.get(gameId));
     const players = getJoinedPlayers(gameId);
     const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
 
@@ -257,25 +241,26 @@ router.patch('/:id', (req, res) => {
     const { status, isPublic } = req.body;
     const gameId = req.params.id;
 
-    const game = db.games.get(gameId);
+    const row = stmts.getGame.get(gameId);
 
-    if (!game) {
+    if (!row) {
       return res.status(404).json({ error: 'Game not found' });
     }
 
     if (status && ['open', 'full', 'locked', 'cancelled'].includes(status)) {
-      game.status = status;
+      stmts.updateGameStatus.run(status, gameId);
     }
 
     if (typeof isPublic === 'boolean') {
-      game.isPublic = isPublic;
+      stmts.updateGameVisibility.run(isPublic ? 1 : 0, gameId);
     }
 
+    const updatedGame = formatGame(stmts.getGame.get(gameId));
     const players = getJoinedPlayers(gameId);
     const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
 
     res.json({
-      ...game,
+      ...updatedGame,
       joinUrl: `${baseUrl}/join/${gameId}`,
       players,
       playerCount: players.length
@@ -293,25 +278,24 @@ router.patch('/:id/players/:playerId', (req, res) => {
     const gameId = req.params.id;
     const playerId = req.params.playerId;
 
-    const game = db.games.get(gameId);
-    if (!game) {
+    const row = stmts.getGame.get(gameId);
+    if (!row) {
       return res.status(404).json({ error: 'Game not found' });
     }
 
-    const joinKey = `${gameId}:${playerId}`;
-    const join = db.joins.get(joinKey);
+    const join = stmts.getJoin.get(gameId, playerId);
     if (!join) {
       return res.status(404).json({ error: 'Player not found in this game' });
     }
 
     // Update skill level (1-5) or null to remove
     if (skillLevel === null || (skillLevel >= 1 && skillLevel <= 5)) {
-      join.skillLevel = skillLevel;
-      db.joins.set(joinKey, join);
+      stmts.updateSkillLevel.run(skillLevel, gameId, playerId);
     } else {
       return res.status(400).json({ error: 'Skill level must be between 1 and 5' });
     }
 
+    const game = formatGame(stmts.getGame.get(gameId));
     const players = getJoinedPlayers(gameId);
     const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
 
@@ -333,24 +317,20 @@ router.delete('/:id/players/:playerId', (req, res) => {
     const gameId = req.params.id;
     const playerId = req.params.playerId;
 
-    const game = db.games.get(gameId);
-    if (!game) {
+    const row = stmts.getGame.get(gameId);
+    if (!row) {
       return res.status(404).json({ error: 'Game not found' });
     }
 
-    const joinKey = `${gameId}:${playerId}`;
-    const join = db.joins.get(joinKey);
+    const join = stmts.getJoin.get(gameId, playerId);
     if (!join) {
       return res.status(404).json({ error: 'Player not found in this game' });
     }
 
-    // Remove the join record
-    db.joins.delete(joinKey);
-
-    // Update game status (might go from full to open)
+    stmts.deleteJoin.run(gameId, playerId);
     updateGameStatus(gameId);
 
-    const updatedGame = db.games.get(gameId);
+    const updatedGame = formatGame(stmts.getGame.get(gameId));
     const players = getJoinedPlayers(gameId);
     const baseUrl = process.env.BASE_URL || `http://${req.get('host')}`;
 
@@ -375,18 +355,17 @@ router.delete('/:id', (req, res) => {
   try {
     const gameId = req.params.id;
 
-    if (!db.games.has(gameId)) {
+    const row = stmts.getGame.get(gameId);
+    if (!row) {
       return res.status(404).json({ error: 'Game not found' });
     }
 
-    // Delete joins for this game
-    for (const [key, join] of db.joins) {
-      if (join.gameId === gameId) {
-        db.joins.delete(key);
-      }
-    }
+    const deleteTransaction = db.transaction(() => {
+      stmts.deleteGameJoins.run(gameId);
+      stmts.deleteGame.run(gameId);
+    });
+    deleteTransaction();
 
-    db.games.delete(gameId);
     res.json({ success: true });
   } catch (error) {
     console.error('Delete game error:', error);

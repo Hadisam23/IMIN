@@ -27,3 +27,11 @@ ios/ImIn/ImIn.xcodeproj/xcuserdata/
 # Logs
 *.log
 npm-debug.log*
+
+# Data backups (contain PII)
+data-backup*.json
+
+# SQLite database
+*.db
+*.db-wal
+*.db-shm
