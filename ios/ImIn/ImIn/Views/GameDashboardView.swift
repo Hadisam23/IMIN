@@ -16,6 +16,7 @@ struct GameDashboardView: View {
     @State private var showCancelConfirm = false
     @State private var showTeamSplit = false
     @State private var editingSkillPlayerId: String?
+    @State private var showEditSheet = false
 
     private let refreshTimer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
@@ -84,6 +85,15 @@ struct GameDashboardView: View {
         .sheet(isPresented: $showShareSheet) {
             if let url = game?.joinUrl {
                 ShareSheet(items: [URL(string: url)!])
+            }
+        }
+        .sheet(isPresented: $showEditSheet, onDismiss: {
+            Task { await loadGame() }
+        }) {
+            if let game = game {
+                EditGameSheet(game: game) { updatedGame in
+                    self.game = updatedGame
+                }
             }
         }
         .sheet(isPresented: $showTeamSplit) {
@@ -195,9 +205,23 @@ struct GameDashboardView: View {
 
             // Game info
             VStack(alignment: .leading, spacing: 12) {
-                Text(game.sport)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                HStack {
+                    Text(game.sport)
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Spacer()
+
+                    if game.status != .cancelled {
+                        Button {
+                            showEditSheet = true
+                        } label: {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.accentBlue)
+                        }
+                    }
+                }
 
                 HStack(spacing: 16) {
                     Label(game.formattedTime, systemImage: "calendar")
@@ -692,6 +716,120 @@ struct InfoRow: View {
                 Text(value)
                     .font(.subheadline)
             }
+        }
+    }
+}
+
+// MARK: - Edit Game Sheet
+struct EditGameSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    private let api = APIService.shared
+
+    let game: Game
+    let onSave: (Game) -> Void
+
+    @State private var location: String
+    @State private var gameDate: Date
+    @State private var gameTime: Date
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    init(game: Game, onSave: @escaping (Game) -> Void) {
+        self.game = game
+        self.onSave = onSave
+
+        _location = State(initialValue: game.location)
+
+        // Parse existing time
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var parsed = formatter.date(from: game.time)
+        if parsed == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            parsed = formatter.date(from: game.time)
+        }
+        let date = parsed ?? Date()
+        _gameDate = State(initialValue: date)
+        _gameTime = State(initialValue: date)
+    }
+
+    private var combinedDateTime: Date {
+        let calendar = Calendar.current
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: gameDate)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: gameTime)
+        var combined = DateComponents()
+        combined.year = dateComponents.year
+        combined.month = dateComponents.month
+        combined.day = dateComponents.day
+        combined.hour = timeComponents.hour
+        combined.minute = timeComponents.minute
+        return calendar.date(from: combined) ?? Date()
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Location") {
+                    TextField("Where are we playing?", text: $location)
+                }
+
+                Section("Date & Time") {
+                    DatePicker("Date", selection: $gameDate, displayedComponents: .date)
+                        .accentColor(.accentBlue)
+                    DatePicker("Time", selection: $gameTime, displayedComponents: .hourAndMinute)
+                        .accentColor(.accentBlue)
+                }
+            }
+            .navigationTitle("Edit Game")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.accentBlue)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        save()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text("Save")
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .disabled(location.isEmpty || isSaving)
+                    .foregroundColor(.accentBlue)
+                }
+            }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
+            }
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        let newTime = combinedDateTime
+        let newLocation = location.trimmingCharacters(in: .whitespaces)
+        print("[EditGame] Saving time: \(newTime), location: \(newLocation)")
+        Task {
+            do {
+                let updatedGame = try await api.updateGameDetails(
+                    id: game.id,
+                    time: newTime,
+                    location: newLocation
+                )
+                print("[EditGame] Save success, new time string: \(updatedGame.time)")
+                onSave(updatedGame)
+                dismiss()
+            } catch {
+                print("[EditGame] Save failed: \(error)")
+                errorMessage = error.localizedDescription
+            }
+            isSaving = false
         }
     }
 }

@@ -10,6 +10,8 @@ const stmts = {
   getGame: db.prepare(`SELECT * FROM games WHERE id = ?`),
   updateGameStatus: db.prepare(`UPDATE games SET status = ? WHERE id = ?`),
   updateGameVisibility: db.prepare(`UPDATE games SET isPublic = ? WHERE id = ?`),
+  updateGameTime: db.prepare(`UPDATE games SET time = ? WHERE id = ?`),
+  updateGameLocation: db.prepare(`UPDATE games SET location = ? WHERE id = ?`),
   deleteGame: db.prepare(`DELETE FROM games WHERE id = ?`),
   insertPlayer: db.prepare(`INSERT INTO players (id, name, phone) VALUES (?, ?, ?)`),
   insertJoin: db.prepare(`INSERT INTO joins (gameId, playerId, timestamp, skillLevel) VALUES (?, ?, ?, ?)`),
@@ -20,7 +22,6 @@ const stmts = {
   deleteJoin: db.prepare(`DELETE FROM joins WHERE gameId = ? AND playerId = ?`),
   deleteGameJoins: db.prepare(`DELETE FROM joins WHERE gameId = ?`),
   getPublicGames: db.prepare(`SELECT * FROM games WHERE isPublic = 1 AND time >= ?`),
-  getGamesByCreator: db.prepare(`SELECT * FROM games WHERE creatorPhone = ? AND time >= ?`),
   getAllRecentGames: db.prepare(`SELECT * FROM games WHERE time >= ?`),
   phoneInGame: db.prepare(`SELECT 1 FROM joins j JOIN players p ON p.id = j.playerId WHERE j.gameId = ? AND p.phone = ? LIMIT 1`),
 };
@@ -238,7 +239,7 @@ router.post('/:id/join', (req, res) => {
 // PATCH /games/:id - Update game status or visibility
 router.patch('/:id', (req, res) => {
   try {
-    const { status, isPublic } = req.body;
+    const { status, isPublic, time, location } = req.body;
     const gameId = req.params.id;
 
     const row = stmts.getGame.get(gameId);
@@ -253,6 +254,15 @@ router.patch('/:id', (req, res) => {
 
     if (typeof isPublic === 'boolean') {
       stmts.updateGameVisibility.run(isPublic ? 1 : 0, gameId);
+    }
+
+    if (typeof time === 'string' && time.trim() !== '') {
+      console.log(`Updating game ${gameId} time: "${row.time}" -> "${time.trim()}"`);
+      stmts.updateGameTime.run(time.trim(), gameId);
+    }
+
+    if (typeof location === 'string' && location.trim() !== '') {
+      stmts.updateGameLocation.run(location.trim(), gameId);
     }
 
     const updatedGame = formatGame(stmts.getGame.get(gameId));

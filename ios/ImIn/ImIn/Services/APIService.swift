@@ -118,6 +118,7 @@ final class APIService: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let timeString = formatter.string(from: time)
 
         let body = CreateGameRequest(
@@ -202,6 +203,44 @@ final class APIService: Sendable {
             if let httpResponse = response as? HTTPURLResponse,
                httpResponse.statusCode >= 400 {
                 throw APIError.serverError("Failed to update game visibility")
+            }
+
+            return try decoder.decode(Game.self, from: data)
+        } catch let error as APIError {
+            throw error
+        } catch let error as DecodingError {
+            throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
+    func updateGameDetails(id: String, time: Date? = nil, location: String? = nil) async throws -> Game {
+        guard let url = URL(string: "\(baseURL)/games/\(id)") else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: String] = [:]
+        if let time = time {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            body["time"] = formatter.string(from: time)
+        }
+        if let location = location {
+            body["location"] = location
+        }
+        request.httpBody = try encoder.encode(body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode >= 400 {
+                throw APIError.serverError("Failed to update game details")
             }
 
             return try decoder.decode(Game.self, from: data)

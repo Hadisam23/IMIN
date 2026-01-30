@@ -6,9 +6,9 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            ProfileView()
+            HomeView()
                 .tabItem {
-                    Label("Profile", systemImage: "person.fill")
+                    Label("Home", systemImage: "house.fill")
                 }
                 .tag(0)
 
@@ -24,11 +24,17 @@ struct MainTabView: View {
                 }
                 .tag(2)
 
+            ProfileView()
+                .tabItem {
+                    Label("Profile", systemImage: "person.fill")
+                }
+                .tag(3)
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
-                .tag(3)
+                .tag(4)
         }
         .tint(.accentBlue)
     }

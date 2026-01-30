@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
@@ -19,38 +19,6 @@ app.use('/games', gamesRouter);
 // Serve join page for /join/:gameId
 app.get('/join/:gameId', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'join.html'));
-});
-
-// Seed endpoint - POST backup data to restore games
-app.post('/seed', (req, res) => {
-  try {
-    const data = req.body;
-    if (!data.games || !Array.isArray(data.games)) {
-      return res.status(400).json({ error: 'Expected { games: [...] }' });
-    }
-
-    const insertGame = db.prepare(`INSERT OR IGNORE INTO games (id, sport, time, location, level, maxPlayers, isPublic, creatorPhone, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    const insertPlayer = db.prepare(`INSERT OR IGNORE INTO players (id, name, phone) VALUES (?, ?, ?)`);
-    const insertJoin = db.prepare(`INSERT OR IGNORE INTO joins (gameId, playerId, timestamp, skillLevel) VALUES (?, ?, ?, ?)`);
-
-    const seed = db.transaction(() => {
-      for (const game of data.games) {
-        insertGame.run(game.id, game.sport, game.time, game.location, game.level, game.maxPlayers, game.isPublic ? 1 : 0, game.creatorPhone || null, game.status, game.createdAt);
-        if (game.players) {
-          for (const player of game.players) {
-            insertPlayer.run(player.id, player.name, player.phone || null);
-            insertJoin.run(game.id, player.id, player.timestamp, player.skillLevel || null);
-          }
-        }
-      }
-    });
-
-    seed();
-    res.json({ success: true, gamesSeeded: data.games.length });
-  } catch (error) {
-    console.error('Seed error:', error);
-    res.status(500).json({ error: 'Failed to seed data' });
-  }
 });
 
 // Health check

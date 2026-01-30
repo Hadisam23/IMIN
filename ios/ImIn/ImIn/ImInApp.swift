@@ -11,6 +11,7 @@ import SwiftUI
 struct ImInApp: App {
     @StateObject private var userManager = UserManager()
     @AppStorage("appearanceMode") private var appearanceMode = 0
+    @State private var showLaunch = true
 
     private var colorScheme: ColorScheme? {
         switch appearanceMode {
@@ -22,19 +23,29 @@ struct ImInApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if userManager.isAuthenticated {
-                    if userManager.hasCompletedOnboarding {
-                        MainTabView()
+            ZStack {
+                Group {
+                    if userManager.isAuthenticated {
+                        if userManager.hasCompletedOnboarding {
+                            MainTabView()
+                        } else {
+                            OnboardingView()
+                        }
                     } else {
-                        OnboardingView()
+                        SignInView()
                     }
-                } else {
-                    SignInView()
+                }
+                .environmentObject(userManager)
+                .preferredColorScheme(colorScheme)
+
+                if showLaunch {
+                    LaunchAnimationView {
+                        showLaunch = false
+                    }
+                    .ignoresSafeArea()
+                    .zIndex(1)
                 }
             }
-            .environmentObject(userManager)
-            .preferredColorScheme(colorScheme)
         }
     }
 }
