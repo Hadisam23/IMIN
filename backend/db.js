@@ -40,4 +40,18 @@ db.exec(`
   );
 `);
 
+// Graceful shutdown: checkpoint WAL and close DB
+function closeDb() {
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.close();
+    console.log('Database closed cleanly');
+  } catch (e) {
+    console.error('Error closing database:', e);
+  }
+}
+
+process.on('SIGTERM', () => { closeDb(); process.exit(0); });
+process.on('SIGINT', () => { closeDb(); process.exit(0); });
+
 module.exports = db;

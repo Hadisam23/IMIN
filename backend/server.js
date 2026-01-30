@@ -23,7 +23,9 @@ app.get('/join/:gameId', (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const gameCount = db.prepare('SELECT COUNT(*) as count FROM games').get().count;
+  const dbPath = process.env.DB_PATH || 'default (local data.db)';
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), games: gameCount, dbPath });
 });
 
 // Seed endpoint - POST /seed to populate DB with test data
